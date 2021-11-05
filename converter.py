@@ -2,6 +2,7 @@
 import numpy as np
 import ctypes
 import os
+import re
 
 #
 def unique(a):
@@ -20,11 +21,11 @@ def seperate_table(s, flag):
   #print('Die seperierte Liste:')
   #print(a)
   #exit()
-  if flag == 'new':
+  if flag == 'old':
     freq = np.zeros((round(len(a)/4)))
     for i in range(0, round(len(a)/4)-1):
       freq[i] = float(a[4*i+1])
-  elif flag == 'old':
+  elif flag == 'new':
     freq = np.zeros((round(len(a)/4)))
     for i in range(0, round(len(a)/4)-1):
       freq[i] = float(a[3*i+1])
@@ -136,7 +137,12 @@ key = str(input())
 #
 if key == "1":
   name = str(input('\n Bitte geben Sie den Namen der zu konvertierenden Datei an! \n'))
-  table = name + '.txt'
+  if re.search(r'(.txt)', name) != None:
+    table = name
+    e = re.search(r'(.txt)', name).span()
+    name = name[:e[0]]
+  else:
+    table = name + '.txt'
   li = open(table, 'r+')
   s = li.read()
   li.close()
@@ -152,12 +158,26 @@ if key == "1":
 #
 elif key == "2":
   name = str(input('\n Bitte geben Sie den Namen der zu konvertierenden Datei an! \n'))
-  table = name + '.txt'
+  #print(name, 'What is matched? ', re.match(r'([A-Za-z_]*)(.txt)', name).span(1))
+  if re.search(r'(.txt)', name) != None:
+    table = name
+    e = re.search(r'(.txt)', name).span()
+    name = name[:e[0]]
+  else:
+    table = name + '.txt'
   li = open(table, 'r+')
   s = li.read()
   li.close()
   #print(s)
-  flag = 'new'
+  s_np = np.array(re.split(r'\n', s))
+  #print(s_np)
+  #print(re.findall(r'\t', s_np[0]))
+  if len(re.findall(r'\t', s_np[0])) == 4:
+    flag = 'old'
+  if len(re.findall(r'\t', s_np[0])) == 3:
+    flag = 'new'
+    exit('\nIt is already the NEW structure!\n')
+  #flag = 'old'
   freq_list = seperate_table(s, flag)
   name_new = name + '.txt'
   #print('Frequenzreihe:')
@@ -189,17 +209,31 @@ elif key == "2":
   #print('Finale Liste:')
   #print(final_list)
   #exit()
+  flag = 'new'
   create(final_list, name, flag)
   print('Die konvertierte Tabelle wurde erstellt!')
 #
 elif key == "3":
   name = str(input('\n Bitte geben Sie den Namen der zu konvertierenden Datei an! \n'))
-  table = name + '.txt'
+  if re.search(r'(.txt)', name) != None:
+    table = name
+    e = re.search(r'(.txt)', name).span()
+    name = name[:e[0]]
+  else:
+    table = name + '.txt'
   li = open(table, 'r+')
   s = li.read()
   li.close()
   #print(s)
-  flag = 'old'
+  s_np = np.array(re.split(r'\n', s))
+  #print(s_np)
+  #print(re.findall(r'\t', s_np[0]))
+  if len(re.findall(r'\t', s_np[0])) == 4:
+    flag = 'old'
+    exit('\nIt is already the OLD structure!\n')
+  if len(re.findall(r'\t', s_np[0])) == 3:
+    flag = 'new'
+  #flag = 'new'
   freq_list = seperate_table(s, flag)
   name_new = name + '.txt'
   #print('Frequenzreihe:')
@@ -231,6 +265,7 @@ elif key == "3":
   #print('Finale Liste:')
   #print(final_list)
   #exit()
+  flag = 'old'
   create(final_list, name, flag)
   print('Die konvertierte Tabelle wurde erstellt!')
 #
