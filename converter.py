@@ -1,5 +1,53 @@
 ﻿# imports
 import glob
+import pip
+from sys import platform
+import sys
+
+
+def install(package):
+    pip.main(["install", package])
+
+
+try:
+    from screeninfo import get_monitors
+
+except:
+    print(f"Module is not installed and will be installed now!")
+
+    install("screeninfo")
+
+
+# for determining the full screen function
+if platform == "linux":
+    # linux
+
+    from screeninfo import get_monitors
+
+    M = ()
+    for m in get_monitors():
+        if m.is_primary:
+            M = m
+
+    ##print(M.height, M.width)
+    height = M.height // 10
+    width = M.width // 10
+    # print(height, width)
+
+    sys.stdout.write("\x1b[8;{rows};{cols}t".format(rows=height, cols=width))
+
+
+elif platform == "win32":
+    # Windows...
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32")
+    user32 = ctypes.WinDLL("user32")
+
+    SW_MAXIMIZE = 3
+
+    hWnd = kernel32.GetConsoleWindow()
+    user32.ShowWindow(hWnd, SW_MAXIMIZE)
 
 
 def read_table():
@@ -80,7 +128,7 @@ def write_table(version, lines):
             f.write(line + "\n") if i < len(lines) - 1 else f.write(line)
 
 
-print("Welcome to the Velleman List Editor!")
+print("\nWelcome to the Velleman List Editor!\n")
 
 selection = "Please select one of the following modi: \n \
             1.) \tFor the conversion of the (old|new) table into the list in 'frequenzen.txt' press '1'! \n \
