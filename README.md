@@ -9,6 +9,6 @@ The program is written in __Python3__
  
  -select a menu entry
  
- -type requested values (like: filename, frequency dwell time, peak-to-peak voltage)
+ -type requested values (like: filename, peak-to-peak voltage, frequency dwell time)
 
 # Have fun with it!
