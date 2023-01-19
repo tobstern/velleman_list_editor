@@ -52,16 +52,16 @@ def write_table(version, lines):
 
             line = []
 
-            for i, elem in zip(range(4), [cols[0]] + [freqs[j]] + cols[1:]):
+            freq = lines[j][1] if mod in [2, 3] else lines[j]
+
+            for i, elem in zip(range(4), [cols[0]] + [freq] + cols[1:]):
+
                 if i == 0:
                     # waveform
                     line.append(elem)
                 elif i == 1:
                     # frequency
-                    line.append(table[j][i]) if mod not in [
-                        4,
-                        5,
-                    ] else line.append(elem)
+                    line.append(freq)
                 elif i == 2:
                     # Vpp
                     line.append(elem)
@@ -83,7 +83,7 @@ def write_table(version, lines):
 print("Welcome to the Velleman List Editor!")
 
 selection = "Please select one of the following modi: \n \
-            1.) \tFor the conversion of the list in 'frequenzen.txt' press '1'! \n \
+            1.) \tFor the conversion of the (old|new) table into the list in 'frequenzen.txt' press '1'! \n \
             2.) \tFor conversion of old table format (PCGU1000) into the new one (PCSU200) press '2'! \n \
             3.) \tFor conversion of new table format (PCSU200) into the old one (PCGU1000) press '3'! \n \
             4.) \tFor creation of the old table format from the list in 'frequenzen.txt' press '4'! \n \
@@ -155,7 +155,7 @@ if mod == 1:
     for line in table:
         freqs += line[1] + ", "
 
-    freqs = f"{fname.replace('.txt', '')}: " + freqs[:-1]
+    freqs = f"{fname.replace('.txt', '').replace(' ', '_')}: " + freqs[:-1]
 
     # save frequencies in "frequenzen.txt"
     with open("frequenzen.txt", "w+") as f:
@@ -165,7 +165,10 @@ if mod == 2:
     # 2.) \tFor conversion of old table format (PCGU1000) into the new one (PCSU200)
     table, version = read_table()
 
-    fname = fname.replace("old", "") + "_new"
+    fname = (
+        fname.replace(".txt", "").replace("old", "").replace(" ", "_")
+        + "_new.txt"
+    )
 
     table_c = table[:]
     table = []
@@ -181,7 +184,10 @@ if mod == 3:
     table, version = read_table()
 
     fname = (
-        fname.replace(".txt", "").replace("_new", "").replace("_pcsu200", "")
+        fname.replace(".txt", "")
+        .replace("_new", "")
+        .replace("_pcsu200", "")
+        .replace(" ", "_")
         + "_old.txt"
     )
 
@@ -192,7 +198,7 @@ if mod == 4:
 
     fname, freqs = read_list()
 
-    fname += ".txt"
+    fname = fname.replace(" ", "_") + ".txt"
 
     write_table("old", freqs)
 
@@ -201,6 +207,6 @@ if mod == 5:
 
     fname, freqs = read_list()
 
-    fname += "_new.txt"
+    fname = fname.replace(" ", "_") + "_new.txt"
 
     write_table("new", freqs)
