@@ -209,6 +209,9 @@ if mod == 1:
     with open("frequenzen.txt", "w+") as f:
         f.write(freqs)
 
+    # success message:
+    print("\nThe program finished this task successfully!")
+
 if mod == 2:
     # 2.) \tFor conversion of old table format (PCGU1000) into the new one (PCSU200)
     table, version = read_table()
@@ -227,6 +230,9 @@ if mod == 2:
 
     write_table("new", table)
 
+    # success message:
+    print("\nThe program finished this task successfully!")
+
 if mod == 3:
     # 3.) \tFor conversion of new table format (PCSU200) into the old one (PCGU1000)
     table, version = read_table()
@@ -241,6 +247,9 @@ if mod == 3:
 
     write_table("old", table)
 
+    # success message:
+    print("\nThe program finished this task successfully!")
+
 if mod == 4:
     # 4.) \tFor creation of the old table format from the list in 'frequenzen.txt'
 
@@ -250,6 +259,9 @@ if mod == 4:
 
     write_table("old", freqs)
 
+    # success message:
+    print("\nThe program finished this task successfully!")
+
 if mod == 5:
     # 5.) \tFor creation of the new table format from the list in 'frequenzen.txt'
 
@@ -258,3 +270,9 @@ if mod == 5:
     fname = fname.replace(" ", "_") + "_new.txt"
 
     write_table("new", freqs)
+
+    # success message:
+    print("\nThe program finished this task successfully!")
+
+# hold the terminal/cmd window - for any key to press:
+input("\nPress any key to close the window:\n")
