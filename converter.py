@@ -50,6 +50,12 @@ elif platform == "win32":
     user32.ShowWindow(hWnd, SW_MAXIMIZE)
 
 
+def print_success():
+
+    # the success message
+    print("\nThe program finished this task successfully!")
+
+
 def read_table():
     table = []
     for line in open(fname, "r").read().strip().splitlines():
@@ -210,7 +216,7 @@ if mod == 1:
         f.write(freqs)
 
     # success message:
-    print("\nThe program finished this task successfully!")
+    print_success()
 
 if mod == 2:
     # 2.) \tFor conversion of old table format (PCGU1000) into the new one (PCSU200)
@@ -231,7 +237,7 @@ if mod == 2:
     write_table("new", table)
 
     # success message:
-    print("\nThe program finished this task successfully!")
+    print_success()
 
 if mod == 3:
     # 3.) \tFor conversion of new table format (PCSU200) into the old one (PCGU1000)
@@ -248,7 +254,7 @@ if mod == 3:
     write_table("old", table)
 
     # success message:
-    print("\nThe program finished this task successfully!")
+    print_success()
 
 if mod == 4:
     # 4.) \tFor creation of the old table format from the list in 'frequenzen.txt'
@@ -260,7 +266,7 @@ if mod == 4:
     write_table("old", freqs)
 
     # success message:
-    print("\nThe program finished this task successfully!")
+    print_success()
 
 if mod == 5:
     # 5.) \tFor creation of the new table format from the list in 'frequenzen.txt'
@@ -272,7 +278,7 @@ if mod == 5:
     write_table("new", freqs)
 
     # success message:
-    print("\nThe program finished this task successfully!")
+    print_success()
 
 # hold the terminal/cmd window - for any key to press:
 input("\nPress any key to close the window:\n")
