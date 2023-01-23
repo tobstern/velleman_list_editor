@@ -106,7 +106,7 @@ def write_table(version, lines):
 
             line = []
 
-            freq = lines[j][1] if mod in [2, 3] else lines[j]
+            freq = lines[j][1] if mod in [2, 3, 6] else lines[j]
 
             for i, elem in zip(range(4), [cols[0]] + [freq] + cols[1:]):
 
@@ -141,7 +141,9 @@ selection = "Please select one of the following modi: \n \
             2.) \tFor conversion of old table format (PCGU1000) into the new one (PCSU200) press '2'! \n \
             3.) \tFor conversion of new table format (PCSU200) into the old one (PCGU1000) press '3'! \n \
             4.) \tFor creation of the old table format from the list in 'frequenzen.txt' press '4'! \n \
-            5.) \tFor creation of the new table format from the list in 'frequenzen.txt' press '5'!"
+            5.) \tFor creation of the new table format from the list in 'frequenzen.txt' press '5'!\n \
+            6.) \tFor changes to the values only press '6'!"
+
 
 print(selection)
 
@@ -156,7 +158,7 @@ except:
     exit(0)
 
 
-if mod < 4:
+if mod < 4 or mod == 6:
     # use a partial string from user, to print all similar filenames
     partial_str = str(
         input(
@@ -261,7 +263,9 @@ if mod == 4:
 
     fname, freqs = read_list()
 
-    fname = fname.replace(" ", "_") + ".txt"
+    fname = (
+        fname.replace(" ", "_").replace("_new", "").replace("_old", "") + ".txt"
+    )
 
     write_table("old", freqs)
 
@@ -273,12 +277,28 @@ if mod == 5:
 
     fname, freqs = read_list()
 
-    fname = fname.replace(" ", "_") + "_new.txt"
+    fname = (
+        fname.replace(" ", "_").replace("_new", "").replace("_old", "")
+        + "_new.txt"
+    )
 
     write_table("new", freqs)
 
     # success message:
     print_success()
+
+if mod == 6:
+    # only change the values, given by user
+
+    table, version = read_table()
+
+    fname = fname.replace(".txt", "") + "_copy.txt"
+
+    write_table(version, table)
+
+    # success message:
+    print_success()
+
 
 # hold the terminal/cmd window - for any key to press:
 input("\nPress any key to close the window:\n")
