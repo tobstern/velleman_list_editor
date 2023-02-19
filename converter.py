@@ -95,7 +95,15 @@ def read_list():
 
     # set() for deleting all multiplicates
     # print(freqs)
-    return fname, list(set(f.strip() for f in freqs[1:] if f.strip() != ""))
+
+    seen = []
+
+    for f in freqs[1:]:
+
+        if f.strip() != "" and f.strip() not in seen:
+            seen.append(f.strip())
+
+    return fname, seen
 
 
 def write_table(version, lines):
