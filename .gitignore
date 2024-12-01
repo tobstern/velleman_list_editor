@@ -1,0 +1,27 @@
+# Ignore everything
+velleman_list_editor_rust/*
+
+# Except these files and directories
+!velleman_list_editor_rust/Cargo.toml
+!velleman_list_editor_rust/src/
+!velleman_list_editor_rust/target/debug/*.exe
+!velleman_list_editor_rust/target/debug/*.sh
+!velleman_list_editor_rust/target/release/*.exe
+!velleman_list_editor_rust/target/release/*.sh
+
+# Ignore other Cargo-related files
+/velleman_list_editor_rust/target/*
+!velleman_list_editor_rust/target/debug/*.exe
+!velleman_list_editor_rust/target/debug/*.sh
+!velleman_list_editor_rust/target/release/*.exe
+!velleman_list_editor_rust/target/release/*.sh
+
+# Ignore Python bytecode files
+*.pyc
+__pycache__/
+
+# Ignore other common files
+.DS_Store
+*.log
+*.tmp
+*.swp

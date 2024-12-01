@@ -1,12 +1,11 @@
-﻿use std::fs::File;
+use std::fs::File;
+use std::io::stdin;
 use std::io::{self, BufRead, Write};
 use std::path::Path;
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
 use termion::terminal_size;
-use std::io::stdin;
 
 fn install(package: &str) {
-    // In Rust, we don't have a direct equivalent of pip. Dependencies are managed via Cargo.toml.
     println!("Please add {} to your Cargo.toml dependencies.", package);
 }
 
@@ -31,7 +30,11 @@ fn read_table(fname: &str) -> (Vec<Vec<String>>, String) {
         for line in lines {
             if let Ok(ip) = line {
                 let cols: Vec<String> = ip.split('\t').map(|s| s.to_string()).collect();
-                version = if cols.len() == 5 { "old".to_string() } else { "new".to_string() };
+                version = if cols.len() == 5 {
+                    "old".to_string()
+                } else {
+                    "new".to_string()
+                };
                 table.push(cols);
             }
         }
@@ -42,7 +45,7 @@ fn read_table(fname: &str) -> (Vec<Vec<String>>, String) {
 
 fn read_list(fname: &str) -> (String, Vec<String>) {
     let mut list = Vec::new();
-    let mut filename = String::new();
+    let filename = String::new();
 
     if let Ok(lines) = read_lines(fname) {
         for line in lines {
@@ -64,7 +67,13 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
-fn write_table(version: &str, lines: Vec<Vec<String>>, fname: &str, mod_choice: i32, cols: &Vec<String>) {
+fn write_table(
+    version: &str,
+    lines: Vec<Vec<String>>,
+    fname: &str,
+    mod_choice: i32,
+    cols: &Vec<String>,
+) {
     let mut file = File::create(fname).expect("Unable to create file");
     for j in 0..lines.len() {
         let mut line = Vec::new();
@@ -74,7 +83,15 @@ fn write_table(version: &str, lines: Vec<Vec<String>>, fname: &str, mod_choice: 
             &lines[j][0]
         };
 
-        for (i, elem) in [cols[0].clone(), freq.to_string(), cols[1].clone(), cols[2].clone()].iter().enumerate() {
+        for (i, elem) in [
+            cols[0].clone(),
+            freq.to_string(),
+            cols[1].clone(),
+            cols[2].clone(),
+        ]
+        .iter()
+        .enumerate()
+        {
             if i == 0 {
                 line.push(elem.clone());
             } else if i == 1 {
@@ -102,7 +119,7 @@ fn write_table(version: &str, lines: Vec<Vec<String>>, fname: &str, mod_choice: 
 
 fn main() {
     let sys = System::new_all();
-    let platform = sys.name().unwrap_or_default();
+    let platform = sysinfo::System::name().unwrap_or_default();
 
     if platform == "Linux" {
         let (width, height) = get_monitors();
@@ -131,11 +148,16 @@ fn main() {
     let mut fname = String::new();
 
     if mod_choice < 4 || mod_choice == 6 {
-        println!("As a help, type in a fraction of the filename.\nAll similar filenames will be shown:");
+        println!(
+            "As a help, type in a fraction of the filename.\nAll similar filenames will be shown:"
+        );
         let mut partial_str = String::new();
-        stdin().read_line(&mut partial_str).expect("Failed to read line");
+        stdin()
+            .read_line(&mut partial_str)
+            .expect("Failed to read line");
 
-        let paths = glob::glob(&format!("./*{}*.txt", partial_str.trim())).expect("Failed to read glob pattern");
+        let paths = glob::glob(&format!("./*{}*.txt", partial_str.trim()))
+            .expect("Failed to read glob pattern");
         for path in paths {
             println!("{}", path.unwrap().display());
         }
@@ -161,7 +183,9 @@ fn main() {
 
         println!("Type in the waveform: [1=sine, 2=rect, 3=tri]");
         let mut waveform = String::new();
-        stdin().read_line(&mut waveform).expect("Failed to read line");
+        stdin()
+            .read_line(&mut waveform)
+            .expect("Failed to read line");
 
         cols.push(waveform.trim().to_string());
         cols.push(vpp.trim().to_string());
@@ -169,9 +193,14 @@ fn main() {
 
         for s in &cols {
             if !s.replace(".", "").chars().all(char::is_numeric) {
-                println!("The given String {} is no number - Press any key to exit!", s);
+                println!(
+                    "The given String {} is no number - Press any key to exit!",
+                    s
+                );
                 let mut exit_input = String::new();
-                stdin().read_line(&mut exit_input).expect("Failed to read line");
+                stdin()
+                    .read_line(&mut exit_input)
+                    .expect("Failed to read line");
                 return;
             }
         }
@@ -184,46 +213,85 @@ fn main() {
             for line in table {
                 freqs.push_str(&format!("{}, ", line[1]));
             }
-            freqs = format!("{}: {}", fname.replace(".txt", "").replace(" ", "_"), freqs.trim_end_matches(", "));
+            freqs = format!(
+                "{}: {}",
+                fname.replace(".txt", "").replace(" ", "_"),
+                freqs.trim_end_matches(", ")
+            );
             let mut file = File::create("frequenzen.txt").expect("Unable to create file");
-            file.write_all(freqs.as_bytes()).expect("Unable to write data");
+            file.write_all(freqs.as_bytes())
+                .expect("Unable to write data");
             print_success();
-        },
+        }
         2 => {
             let (mut table, version) = read_table(&fname);
-            fname = fname.replace(".txt", "").replace("old", "").replace(" ", "_") + "_new.txt";
-            table = table.into_iter().map(|line| vec![line[0].clone(), line[1].clone(), line[3].clone()]).collect();
+            fname = fname
+                .replace(".txt", "")
+                .replace("old", "")
+                .replace(" ", "_")
+                + "_new.txt";
+            table = table
+                .into_iter()
+                .map(|line| vec![line[0].clone(), line[1].clone(), line[3].clone()])
+                .collect();
             write_table("new", table, &fname, mod_choice, &cols);
             print_success();
-        },
+        }
         3 => {
             let (table, version) = read_table(&fname);
-            fname = fname.replace(".txt", "").replace("_new", "").replace("_pcsu200", "").replace(" ", "_") + "_old.txt";
+            fname = fname
+                .replace(".txt", "")
+                .replace("_new", "")
+                .replace("_pcsu200", "")
+                .replace(" ", "_")
+                + "_old.txt";
             write_table("old", table, &fname, mod_choice, &cols);
             print_success();
-        },
+        }
         4 => {
             let (fname, freqs) = read_list("frequenzen.txt");
-            let fname = fname.replace(" ", "_").replace("_new", "").replace("_old", "") + ".txt";
-            write_table("old", freqs.iter().map(|f| vec![f.clone()]).collect(), &fname, mod_choice, &cols);
+            let fname = fname
+                .replace(" ", "_")
+                .replace("_new", "")
+                .replace("_old", "")
+                + ".txt";
+            write_table(
+                "old",
+                freqs.iter().map(|f| vec![f.clone()]).collect(),
+                &fname,
+                mod_choice,
+                &cols,
+            );
             print_success();
-        },
+        }
         5 => {
             let (fname, freqs) = read_list("frequenzen.txt");
-            let fname = fname.replace(" ", "_").replace("_new", "").replace("_old", "") + "_new.txt";
-            write_table("new", freqs.iter().map(|f| vec![f.clone()]).collect(), &fname, mod_choice, &cols);
+            let fname = fname
+                .replace(" ", "_")
+                .replace("_new", "")
+                .replace("_old", "")
+                + "_new.txt";
+            write_table(
+                "new",
+                freqs.iter().map(|f| vec![f.clone()]).collect(),
+                &fname,
+                mod_choice,
+                &cols,
+            );
             print_success();
-        },
+        }
         6 => {
             let (table, version) = read_table(&fname);
             fname = fname.replace(".txt", "") + "_copy.txt";
             write_table(&version, table, &fname, mod_choice, &cols);
             print_success();
-        },
+        }
         _ => println!("Invalid mode selected"),
     }
 
     println!("\nPress any key to close the window:");
     let mut close_input = String::new();
-    stdin().read_line(&mut close_input).expect("Failed to read line");
+    stdin()
+        .read_line(&mut close_input)
+        .expect("Failed to read line");
 }
