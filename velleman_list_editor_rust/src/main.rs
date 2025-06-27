@@ -1,64 +1,182 @@
+/// Velleman List Editor - A tool for converting between different table formats
+/// and managing frequency lists for Velleman devices.
+///
+/// This application provides functionality to:
+/// - Convert tables to frequency lists
+/// - Transform between old (PCGU1000) and new (PCSU200) table formats
+/// - Create tables from frequency lists
+/// - Modify table values
+use crossterm::terminal;
 use std::fs::File;
-use std::io::stdin;
-use std::io::{self, BufRead, Write};
+use std::io::{self, stdin, BufRead, Write};
 use std::path::Path;
 use sysinfo::System;
-use termion::terminal_size;
 
-fn install(package: &str) {
-    println!("Please add {} to your Cargo.toml dependencies.", package);
+/// Represents the version/format of a table
+#[derive(Debug, Clone, PartialEq)]
+enum TableVersion {
+    Old, // PCGU1000 format (5 columns)
+    New, // PCSU200 format (3 columns)
 }
 
-fn get_monitors() -> (u16, u16) {
-    let (width, height) = terminal_size().unwrap();
-    (width, height)
+impl std::fmt::Display for TableVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TableVersion::Old => write!(f, "old"),
+            TableVersion::New => write!(f, "new"),
+        }
+    }
 }
 
-fn set_terminal_size(rows: u16, cols: u16) {
-    println!("\x1b[8;{};{}t", rows, cols);
+/// Configuration for waveform parameters
+#[derive(Debug)]
+struct WaveformConfig {
+    waveform: String, // 1=sine, 2=rect, 3=tri
+    voltage: String,  // Peak-to-peak voltage in Volts
+    duration: String, // Duration in seconds
 }
 
+impl WaveformConfig {
+    /// Creates a new WaveformConfig with validation
+    fn new(waveform: String, voltage: String, duration: String) -> Result<Self, String> {
+        // Validate numeric inputs
+        for (_, value) in [
+            ("waveform", &waveform),
+            ("voltage", &voltage),
+            ("duration", &duration),
+        ] {
+            if !value.replace(".", "").chars().all(char::is_numeric) {
+                return Err(format!("The given String {} is not a number", value));
+            }
+        }
+        Ok(WaveformConfig {
+            waveform,
+            voltage,
+            duration,
+        })
+    }
+
+    /// Converts the configuration to a vector for table operations
+    fn to_vec(&self) -> Vec<String> {
+        vec![
+            self.waveform.clone(),
+            self.voltage.clone(),
+            self.duration.clone(),
+        ]
+    }
+}
+
+/// Gets the terminal size, returning an IO error if unable to determine
+fn get_terminal_size() -> io::Result<(u16, u16)> {
+    terminal::size().map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+}
+
+/// Sets up the terminal based on the current platform
+fn setup_terminal() {
+    let platform = System::name().unwrap_or_default();
+
+    if platform == "Linux" {
+        if let Ok((width, height)) = get_terminal_size() {
+            println!("\x1b[8;{};{}t", height / 10, width / 10);
+        }
+    } else if platform == "Windows" {
+        println!("Windows terminal resizing is not directly supported.");
+    }
+}
+
+fn get_user_input(prompt: &str) -> io::Result<String> {
+    println!("{}", prompt);
+    let mut input = String::new();
+    stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
+}
+
+fn get_waveform_config() -> Result<WaveformConfig, String> {
+    let waveform = get_user_input("Type in the waveform: [1=sine, 2=rect, 3=tri]")
+        .map_err(|e| e.to_string())?;
+    let voltage =
+        get_user_input("Type in the peak-to-peak voltage in [Volt]:").map_err(|e| e.to_string())?;
+    let duration =
+        get_user_input("Type in the duration in [seconds]:").map_err(|e| e.to_string())?;
+
+    WaveformConfig::new(waveform, voltage, duration)
+}
+
+fn find_files_with_pattern(pattern: &str) -> Result<Vec<String>, String> {
+    let glob_pattern = format!("./*{}*.txt", pattern);
+    let paths =
+        glob::glob(&glob_pattern).map_err(|e| format!("Failed to read glob pattern: {}", e))?;
+
+    let mut files = Vec::new();
+    for path in paths {
+        match path {
+            Ok(p) => {
+                println!("{}", p.display());
+                files.push(p.display().to_string());
+            }
+            Err(e) => eprintln!("Error reading path: {}", e),
+        }
+    }
+    Ok(files)
+}
+
+fn get_filename() -> io::Result<String> {
+    println!(
+        "As a help, type in a fraction of the filename.\nAll similar filenames will be shown:"
+    );
+    let partial_str = get_user_input("")?;
+
+    if let Err(e) = find_files_with_pattern(&partial_str) {
+        eprintln!("Warning: {}", e);
+    }
+
+    let mut fname = get_user_input("Type in the filename:")?;
+    if !fname.ends_with(".txt") {
+        fname.push_str(".txt");
+    }
+    Ok(fname)
+}
+
+/// Prints a success message
 fn print_success() {
     println!("\nThe program finished this task successfully!");
 }
 
-fn read_table(fname: &str) -> (Vec<Vec<String>>, String) {
+/// Reads a table file and determines its version based on column count
+/// Returns the table data and version type
+fn read_table(fname: &str) -> io::Result<(Vec<Vec<String>>, TableVersion)> {
     let mut table = Vec::new();
-    let mut version = String::new();
+    let mut version = TableVersion::New;
 
-    if let Ok(lines) = read_lines(fname) {
-        for line in lines {
-            if let Ok(ip) = line {
-                let cols: Vec<String> = ip.split('\t').map(|s| s.to_string()).collect();
-                version = if cols.len() == 5 {
-                    "old".to_string()
-                } else {
-                    "new".to_string()
-                };
-                table.push(cols);
-            }
-        }
+    let lines = read_lines(fname)?;
+    for line in lines {
+        let ip = line?;
+        let cols: Vec<String> = ip.split('\t').map(|s| s.to_string()).collect();
+        version = if cols.len() == 5 {
+            TableVersion::Old
+        } else {
+            TableVersion::New
+        };
+        table.push(cols);
     }
 
-    (table, version)
+    Ok((table, version))
 }
 
-fn read_list(fname: &str) -> (String, Vec<String>) {
+/// Reads a simple list from a file (one item per line)
+fn read_list(fname: &str) -> io::Result<Vec<String>> {
     let mut list = Vec::new();
-    let filename = String::new();
 
-    if let Ok(lines) = read_lines(fname) {
-        for line in lines {
-            if let Ok(ip) = line {
-                list.push(ip);
-            }
-        }
+    let lines = read_lines(fname)?;
+    for line in lines {
+        let ip = line?;
+        list.push(ip);
     }
 
-    (filename, list)
+    Ok(list)
 }
 
-// Helper function to read lines from a file
+/// Helper function to read lines from a file
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
@@ -67,14 +185,17 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
+/// Writes table data to a file with proper formatting based on version
 fn write_table(
-    version: &str,
+    version: &TableVersion,
     lines: Vec<Vec<String>>,
     fname: &str,
     mod_choice: i32,
-    cols: &Vec<String>,
-) {
-    let mut file = File::create(fname).expect("Unable to create file");
+    config: &WaveformConfig,
+) -> io::Result<()> {
+    let mut file = File::create(fname)?;
+    let cols = config.to_vec();
+
     for j in 0..lines.len() {
         let mut line = Vec::new();
         let freq = if mod_choice == 2 || mod_choice == 3 || mod_choice == 6 {
@@ -104,30 +225,118 @@ fn write_table(
             line.push("\t".to_string());
         }
 
-        if version == "old" {
+        if *version == TableVersion::Old {
             line.insert(2, "0\t".to_string());
         }
 
         let line_str = line.join("").trim().to_string();
         if j < lines.len() - 1 {
-            writeln!(file, "{}", line_str).expect("Unable to write data");
+            writeln!(file, "{}", line_str)?;
         } else {
-            write!(file, "{}", line_str).expect("Unable to write data");
+            write!(file, "{}", line_str)?;
         }
     }
+    Ok(())
 }
 
-fn main() {
-    let sys = System::new_all();
-    let platform = sysinfo::System::name().unwrap_or_default();
+fn generate_output_filename(input_fname: &str, suffix: &str, version: &str) -> String {
+    input_fname
+        .replace(".txt", "")
+        .replace("old", "")
+        .replace("_new", "")
+        .replace("_pcsu200", "")
+        .replace(" ", "_")
+        + suffix
+        + version
+        + ".txt"
+}
 
-    if platform == "Linux" {
-        let (width, height) = get_monitors();
-        set_terminal_size(height / 10, width / 10);
-    } else if platform == "Windows" {
-        // Windows terminal resizing is not directly supported in Rust
-        println!("Windows terminal resizing is not supported in this example.");
+fn handle_conversion_mode_1(fname: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let (table, _) = read_table(fname)?;
+    let mut freqs = String::new();
+    for line in table {
+        if line.len() > 1 {
+            freqs.push_str(&format!("{}, ", line[1]));
+        }
     }
+    let output = format!(
+        "{}: {}",
+        fname.replace(".txt", "").replace(" ", "_"),
+        freqs.trim_end_matches(", ")
+    );
+    let mut file = File::create("frequenzen.txt")?;
+    file.write_all(output.as_bytes())?;
+    Ok(())
+}
+
+fn handle_conversion_mode_2(
+    fname: &str,
+    config: &WaveformConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (mut table, _) = read_table(fname)?;
+    let new_fname = generate_output_filename(fname, "_", "new");
+    table = table
+        .into_iter()
+        .filter_map(|line| {
+            if line.len() >= 4 {
+                Some(vec![line[0].clone(), line[1].clone(), line[3].clone()])
+            } else {
+                None
+            }
+        })
+        .collect();
+    write_table(&TableVersion::New, table, &new_fname, 2, config)?;
+    Ok(())
+}
+
+fn handle_conversion_mode_3(
+    fname: &str,
+    config: &WaveformConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (table, _) = read_table(fname)?;
+    let new_fname = generate_output_filename(fname, "_", "old");
+    write_table(&TableVersion::Old, table, &new_fname, 3, config)?;
+    Ok(())
+}
+
+fn handle_conversion_mode_4(config: &WaveformConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let freqs = read_list("frequenzen.txt")?;
+    let output_fname = "output.txt";
+    write_table(
+        &TableVersion::Old,
+        freqs.iter().map(|f| vec![f.clone()]).collect(),
+        output_fname,
+        4,
+        config,
+    )?;
+    Ok(())
+}
+
+fn handle_conversion_mode_5(config: &WaveformConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let freqs = read_list("frequenzen.txt")?;
+    let output_fname = "output_new.txt";
+    write_table(
+        &TableVersion::New,
+        freqs.iter().map(|f| vec![f.clone()]).collect(),
+        output_fname,
+        5,
+        config,
+    )?;
+    Ok(())
+}
+
+fn handle_conversion_mode_6(
+    fname: &str,
+    config: &WaveformConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (table, version) = read_table(fname)?;
+    let new_fname = fname.replace(".txt", "") + "_copy.txt";
+    write_table(&version, table, &new_fname, 6, config)?;
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    setup_terminal();
 
     println!("\nWelcome to the Velleman List Editor!\n");
 
@@ -141,157 +350,60 @@ fn main() {
 
     println!("{}", selection);
 
-    let mut input = String::new();
-    stdin().read_line(&mut input).expect("Failed to read line");
-    let mod_choice: i32 = input.trim().parse().expect("Please enter a number");
+    let input = get_user_input("")?;
+    let mod_choice: i32 = input.parse().map_err(|_| "Please enter a valid number")?;
 
     let mut fname = String::new();
-
     if mod_choice < 4 || mod_choice == 6 {
-        println!(
-            "As a help, type in a fraction of the filename.\nAll similar filenames will be shown:"
-        );
-        let mut partial_str = String::new();
-        stdin()
-            .read_line(&mut partial_str)
-            .expect("Failed to read line");
-
-        let paths = glob::glob(&format!("./*{}*.txt", partial_str.trim()))
-            .expect("Failed to read glob pattern");
-        for path in paths {
-            println!("{}", path.unwrap().display());
-        }
-
-        println!("Type in the filename:");
-        stdin().read_line(&mut fname).expect("Failed to read line");
-        fname = fname.trim().to_string();
-
-        if !fname.ends_with(".txt") {
-            fname.push_str(".txt");
-        }
+        fname = get_filename()?;
     }
 
-    let mut cols = Vec::new();
+    let mut config: Option<WaveformConfig> = None;
     if mod_choice > 1 {
-        println!("Type in the duration in [seconds]:");
-        let mut dur = String::new();
-        stdin().read_line(&mut dur).expect("Failed to read line");
-
-        println!("Type in the peak-to-peak voltage in [Volt]:");
-        let mut vpp = String::new();
-        stdin().read_line(&mut vpp).expect("Failed to read line");
-
-        println!("Type in the waveform: [1=sine, 2=rect, 3=tri]");
-        let mut waveform = String::new();
-        stdin()
-            .read_line(&mut waveform)
-            .expect("Failed to read line");
-
-        cols.push(waveform.trim().to_string());
-        cols.push(vpp.trim().to_string());
-        cols.push(dur.trim().to_string());
-
-        for s in &cols {
-            if !s.replace(".", "").chars().all(char::is_numeric) {
-                println!(
-                    "The given String {} is no number - Press any key to exit!",
-                    s
-                );
-                let mut exit_input = String::new();
-                stdin()
-                    .read_line(&mut exit_input)
-                    .expect("Failed to read line");
-                return;
-            }
-        }
+        config = Some(get_waveform_config()?);
     }
 
     match mod_choice {
         1 => {
-            let (table, version) = read_table(&fname);
-            let mut freqs = String::new();
-            for line in table {
-                freqs.push_str(&format!("{}, ", line[1]));
-            }
-            freqs = format!(
-                "{}: {}",
-                fname.replace(".txt", "").replace(" ", "_"),
-                freqs.trim_end_matches(", ")
-            );
-            let mut file = File::create("frequenzen.txt").expect("Unable to create file");
-            file.write_all(freqs.as_bytes())
-                .expect("Unable to write data");
+            handle_conversion_mode_1(&fname)?;
             print_success();
         }
         2 => {
-            let (mut table, version) = read_table(&fname);
-            fname = fname
-                .replace(".txt", "")
-                .replace("old", "")
-                .replace(" ", "_")
-                + "_new.txt";
-            table = table
-                .into_iter()
-                .map(|line| vec![line[0].clone(), line[1].clone(), line[3].clone()])
-                .collect();
-            write_table("new", table, &fname, mod_choice, &cols);
-            print_success();
+            if let Some(cfg) = config {
+                handle_conversion_mode_2(&fname, &cfg)?;
+                print_success();
+            }
         }
         3 => {
-            let (table, version) = read_table(&fname);
-            fname = fname
-                .replace(".txt", "")
-                .replace("_new", "")
-                .replace("_pcsu200", "")
-                .replace(" ", "_")
-                + "_old.txt";
-            write_table("old", table, &fname, mod_choice, &cols);
-            print_success();
+            if let Some(cfg) = config {
+                handle_conversion_mode_3(&fname, &cfg)?;
+                print_success();
+            }
         }
         4 => {
-            let (fname, freqs) = read_list("frequenzen.txt");
-            let fname = fname
-                .replace(" ", "_")
-                .replace("_new", "")
-                .replace("_old", "")
-                + ".txt";
-            write_table(
-                "old",
-                freqs.iter().map(|f| vec![f.clone()]).collect(),
-                &fname,
-                mod_choice,
-                &cols,
-            );
-            print_success();
+            if let Some(cfg) = config {
+                handle_conversion_mode_4(&cfg)?;
+                print_success();
+            }
         }
         5 => {
-            let (fname, freqs) = read_list("frequenzen.txt");
-            let fname = fname
-                .replace(" ", "_")
-                .replace("_new", "")
-                .replace("_old", "")
-                + "_new.txt";
-            write_table(
-                "new",
-                freqs.iter().map(|f| vec![f.clone()]).collect(),
-                &fname,
-                mod_choice,
-                &cols,
-            );
-            print_success();
+            if let Some(cfg) = config {
+                handle_conversion_mode_5(&cfg)?;
+                print_success();
+            }
         }
         6 => {
-            let (table, version) = read_table(&fname);
-            fname = fname.replace(".txt", "") + "_copy.txt";
-            write_table(&version, table, &fname, mod_choice, &cols);
-            print_success();
+            if let Some(cfg) = config {
+                handle_conversion_mode_6(&fname, &cfg)?;
+                print_success();
+            }
         }
-        _ => println!("Invalid mode selected"),
+        _ => {
+            println!("Invalid mode selected");
+            return Err("Invalid mode selection".into());
+        }
     }
 
-    println!("\nPress any key to close the window:");
-    let mut close_input = String::new();
-    stdin()
-        .read_line(&mut close_input)
-        .expect("Failed to read line");
+    get_user_input("\nPress any key to close the window:")?;
+    Ok(())
 }
